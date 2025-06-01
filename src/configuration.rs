@@ -61,6 +61,12 @@ pub trait VoxelWorldConfig: Resource + Default + Clone {
         10
     }
 
+    type RunIfState: States;
+
+    fn get_run_if_state(&self) -> Option<Self::RunIfState> {
+        None
+    }
+
     /// Strategy for despawning chunks
     fn chunk_despawn_strategy(&self) -> ChunkDespawnStrategy {
         ChunkDespawnStrategy::default()
@@ -163,9 +169,16 @@ pub struct DefaultWorld;
 
 impl DefaultWorld {}
 
+#[derive(States, Hash, Clone, PartialEq, Eq, Debug, Default)]
+pub enum DefaultState {
+    #[default]
+    Default,
+}
+
 impl VoxelWorldConfig for DefaultWorld {
     type MaterialIndex = u8;
     type ChunkUserBundle = ();
+    type RunIfState = DefaultState;
 
     fn texture_index_mapper(
         &self,

@@ -1,5 +1,6 @@
 use bevy::{
     asset::load_internal_asset,
+    ecs::system,
     image::{CompressedImageFormats, ImageSampler, ImageType},
     pbr::ExtendedMaterial,
     prelude::*,
@@ -100,30 +101,33 @@ where
     fn build(&self, app: &mut App) {
         app.init_resource::<C>()
             .add_systems(PreStartup, Internals::<C>::setup)
-            .add_systems(
-                PreUpdate,
-                (
-                    (
-                        (Internals::<C>::spawn_chunks, Internals::<C>::retire_chunks)
-                            .chain(),
-                        Internals::<C>::remesh_dirty_chunks,
-                    )
-                        .chain(),
-                    (
-                        Internals::<C>::flush_voxel_write_buffer,
-                        Internals::<C>::despawn_retired_chunks,
-                        (
-                            Internals::<C>::flush_chunk_map_buffers,
-                            Internals::<C>::flush_mesh_cache_buffers,
-                        ),
-                    )
-                        .chain(),
-                ),
-            )
             .add_event::<ChunkWillSpawn<C>>()
             .add_event::<ChunkWillDespawn<C>>()
             .add_event::<ChunkWillRemesh<C>>()
             .add_event::<ChunkWillUpdate<C>>();
+        let mut systems = (
+            (
+                (Internals::<C>::spawn_chunks, Internals::<C>::retire_chunks).chain(),
+                Internals::<C>::remesh_dirty_chunks,
+            )
+                .chain(),
+            (
+                Internals::<C>::flush_voxel_write_buffer,
+                Internals::<C>::despawn_retired_chunks,
+                (
+                    Internals::<C>::flush_chunk_map_buffers,
+                    Internals::<C>::flush_mesh_cache_buffers,
+                ),
+            )
+                .chain(),
+        );
+
+        if let Some(running_state) = self.config.get_run_if_state() {
+            // systems = systems.run_if(in_state(running_state));
+            app.add_systems(PreUpdate, systems.run_if(in_state(running_state)));
+        } else {
+            app.add_systems(PreUpdate, systems);
+        }
 
         // Spawning of meshes is optional, mainly to simplify testing.
         // This makes voxel_world work with a MinimalPlugins setup.
